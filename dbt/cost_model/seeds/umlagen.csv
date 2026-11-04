@@ -1,0 +1,7 @@
+umlage_code,umlage_name,gueltig_ab,gueltig_bis,ct_pro_kwh,quelle
+KWKG,KWKG-Umlage,2025-01-01,2025-12-31,0.277,netztransparenz.de
+KWKG,KWKG-Umlage,2026-01-01,2026-12-31,0.446,netztransparenz.de
+OFFSHORE,Offshore-Netzumlage,2025-01-01,2025-12-31,0.816,netztransparenz.de
+OFFSHORE,Offshore-Netzumlage,2026-01-01,2026-12-31,0.941,netztransparenz.de
+BESONDERE_NETZNUTZUNG,Aufschlag fuer besondere Netznutzung,2025-01-01,2025-12-31,1.558,netztransparenz.de
+BESONDERE_NETZNUTZUNG,Aufschlag fuer besondere Netznutzung,2026-01-01,2026-12-31,1.559,netztransparenz.de

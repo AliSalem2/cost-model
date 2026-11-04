@@ -1,0 +1,3 @@
+szenario_code,szenario_name,netzentgelt_aufschlag_ct_pro_kwh,quelle
+MIT_BUNDESZUSCHUSS,Bundeszuschuss bleibt bestehen,0.00,Annahme
+OHNE_BUNDESZUSCHUSS,Bundeszuschuss entfaellt,1.60,Beispielwert

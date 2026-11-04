@@ -1,0 +1,15 @@
+.venv-airflow/
+.venv-dbt/
+*.duckdb
+*.duckdb.wal
+dbt/cost_model/target/
+dbt/cost_model/logs/
+dbt/cost_model/dbt_packages/
+dbt/cost_model/historie/
+airflow/*
+!airflow/dags/
+__pycache__/
+data/eingang/*
+!data/eingang/.gitkeep
+*:Zone.Identifier
+dbt/cost_model/.user.yml

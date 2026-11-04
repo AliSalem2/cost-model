@@ -1,0 +1,41 @@
+name: cost_model
+version: "0.2.0"
+config-version: 2
+profile: cost_model
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Offenes Gueltigkeitsende ("gilt bis auf Weiteres") wird intern durch dieses Datum ersetzt.
+  offenes_ende: "9999-12-31"
+  # Fuer dieses Jahr gibt es noch keine veroeffentlichten Umlagen, siehe int_umlagen.
+  umlagen_annahme_jahr: 2027
+  # Beliebiger Tag im Szenariojahr: alle Saetze gelten das ganze Jahr.
+  szenario_stichtag: "2027-01-01"
+  # Parquet-Ablage je Stichtag, relativ zum dbt-Projektordner. Nur eine Ebene: DuckDB legt keine fehlenden Elternordner an.
+  historie_pfad: "historie"
+
+seeds:
+  cost_model:
+    +schema: rohdaten
+    kunden:
+      +column_types:
+        plz: varchar   # sonst wird 01067 (Dresden) zu 1067
+    konzessionsabgabe:
+      +column_types:
+        einwohner_bis: bigint
+        gueltig_bis: date
+    stromsteuer:
+      +column_types:
+        gueltig_bis: date
+
+models:
+  cost_model:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

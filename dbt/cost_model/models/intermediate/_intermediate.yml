@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: int_umlagen
+    description: Umlagen aus stg_umlagen plus Mittelwert-Annahme fuer das Jahr ohne veroeffentlichte Werte.
+    columns:
+      - name: umlage_code
+        tests: [not_null]
+      - name: ct_pro_kwh
+        tests: [not_null]
+      - name: ist_annahme
+        tests: [not_null]
+    tests:
+      - keine_ueberlappenden_zeitraeume:
+          arguments:
+            schluessel: [umlage_code]
+      - zeitraum_gueltig
+
+unit_tests:
+  # KWKG: (0.2 + 0.4) / 2 = 0.3. OFFSHORE hat einen echten 2027-Wert, der gewinnt.
+  - name: annahme_ist_mittelwert_und_echter_wert_gewinnt
+    model: int_umlagen
+    overrides:
+      vars: {umlagen_annahme_jahr: 2027}
+    given:
+      - input: ref('stg_umlagen')
+        rows:
+          - {umlage_code: KWKG, gueltig_ab: 2025-01-01, gueltig_bis: 2025-12-31, ct_pro_kwh: 0.2}
+          - {umlage_code: KWKG, gueltig_ab: 2026-01-01, gueltig_bis: 2026-12-31, ct_pro_kwh: 0.4}
+          - {umlage_code: OFFSHORE, gueltig_ab: 2025-01-01, gueltig_bis: 2025-12-31, ct_pro_kwh: 0.8}
+          - {umlage_code: OFFSHORE, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, ct_pro_kwh: 1.1}
+    expect:
+      rows:
+        - {umlage_code: KWKG, gueltig_ab: 2025-01-01, ct_pro_kwh: 0.2, ist_annahme: false}
+        - {umlage_code: KWKG, gueltig_ab: 2026-01-01, ct_pro_kwh: 0.4, ist_annahme: false}
+        - {umlage_code: KWKG, gueltig_ab: 2027-01-01, ct_pro_kwh: 0.3, ist_annahme: true}
+        - {umlage_code: OFFSHORE, gueltig_ab: 2025-01-01, ct_pro_kwh: 0.8, ist_annahme: false}
+        - {umlage_code: OFFSHORE, gueltig_ab: 2027-01-01, ct_pro_kwh: 1.1, ist_annahme: false}

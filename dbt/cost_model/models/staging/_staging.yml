@@ -1,0 +1,100 @@
+version: 2
+
+models:
+  - name: stg_umlagen
+    description: Gesetzliche Umlagen (KWKG, Offshore, besondere Netznutzung) in ct/kWh.
+    columns:
+      - name: umlage_code
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [KWKG, OFFSHORE, BESONDERE_NETZNUTZUNG]
+      - name: ct_pro_kwh
+        tests: [not_null]
+    tests:
+      - keine_ueberlappenden_zeitraeume:
+          arguments:
+            schluessel: [umlage_code]
+      - zeitraum_gueltig
+
+  - name: stg_netzbetreiber
+    description: Stammdaten der Verteilnetzbetreiber.
+    columns:
+      - name: netzbetreiber_id
+        tests: [not_null, unique]
+
+  - name: stg_netzentgelte
+    description: Netzentgelte Haushalt je Netzbetreiber und Jahr (Grund- und Arbeitspreis).
+    columns:
+      - name: netzbetreiber_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_netzbetreiber')
+                field: netzbetreiber_id
+      - name: arbeitspreis_ct_pro_kwh
+        tests: [not_null]
+      - name: status
+        tests:
+          - accepted_values:
+              arguments:
+                values: [endgueltig, vorlaeufig]
+    tests:
+      - keine_ueberlappenden_zeitraeume:
+          arguments:
+            schluessel: [netzbetreiber_id]
+      - zeitraum_gueltig
+
+  - name: stg_konzessionsabgabe
+    description: Konzessionsabgabe in ct/kWh nach Einwohnerzahl der Gemeinde.
+    tests:
+      # Jede Einwohnerzahl darf genau einer Groessenklasse zugeordnet sein.
+      - keine_ueberlappenden_zeitraeume:
+          arguments:
+            schluessel: [kundengruppe, gueltig_ab]
+            von: einwohner_von
+            bis: einwohner_bis
+      - keine_ueberlappenden_zeitraeume:
+          arguments:
+            schluessel: [kundengruppe, einwohner_von]
+      - zeitraum_gueltig
+
+  - name: stg_stromsteuer
+    description: Stromsteuer in ct/kWh.
+    tests:
+      - keine_ueberlappenden_zeitraeume:
+          arguments:
+            schluessel: [steuersatz_name]
+      - zeitraum_gueltig
+
+  - name: stg_kunden
+    description: Fiktive Haushaltskunden mit Netzgebiet und Jahresverbrauch.
+    columns:
+      - name: kunden_id
+        tests: [not_null, unique]
+      - name: plz
+        tests: [not_null]
+      - name: netzbetreiber_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_netzbetreiber')
+                field: netzbetreiber_id
+      - name: jahresverbrauch_kwh
+        tests: [not_null]
+
+  - name: stg_szenarien
+    description: Szenarien fuer den Bundeszuschuss, Aufschlag in ct/kWh (illustrativ).
+    columns:
+      - name: szenario_code
+        tests:
+          - not_null
+          - unique
+          - accepted_values:
+              arguments:
+                values: [MIT_BUNDESZUSCHUSS, OHNE_BUNDESZUSCHUSS]
+      - name: netzentgelt_aufschlag_ct_pro_kwh
+        tests: [not_null]

@@ -1,0 +1,5 @@
+kundengruppe,einwohner_von,einwohner_bis,ct_pro_kwh,gueltig_ab,gueltig_bis,quelle
+Tarifkunde,0,25000,1.32,2025-01-01,,KAV § 2
+Tarifkunde,25001,100000,1.59,2025-01-01,,KAV § 2
+Tarifkunde,100001,500000,1.99,2025-01-01,,KAV § 2
+Tarifkunde,500001,,2.39,2025-01-01,,KAV § 2

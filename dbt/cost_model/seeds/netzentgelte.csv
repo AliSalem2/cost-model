@@ -1,0 +1,16 @@
+netzbetreiber_id,gueltig_ab,gueltig_bis,grundpreis_eur_pro_jahr,arbeitspreis_ct_pro_kwh,status,quelle
+STROMNETZ_BERLIN,2025-01-01,2025-12-31,55.00,8.10,endgueltig,Beispielwert
+STROMNETZ_BERLIN,2026-01-01,2026-12-31,55.00,6.50,endgueltig,Beispielwert
+STROMNETZ_BERLIN,2027-01-01,2027-12-31,58.00,6.75,vorlaeufig,Beispielwert
+SWM_INFRASTRUKTUR,2025-01-01,2025-12-31,40.00,7.40,endgueltig,Beispielwert
+SWM_INFRASTRUKTUR,2026-01-01,2026-12-31,40.00,5.90,endgueltig,Beispielwert
+SWM_INFRASTRUKTUR,2027-01-01,2027-12-31,42.00,6.15,vorlaeufig,Beispielwert
+BAYERNWERK,2025-01-01,2025-12-31,70.00,9.80,endgueltig,Beispielwert
+BAYERNWERK,2026-01-01,2026-12-31,70.00,8.10,endgueltig,Beispielwert
+BAYERNWERK,2027-01-01,2027-12-31,72.00,8.35,vorlaeufig,Beispielwert
+SACHSENNETZE,2025-01-01,2025-12-31,60.00,8.90,endgueltig,Beispielwert
+SACHSENNETZE,2026-01-01,2026-12-31,60.00,7.20,endgueltig,Beispielwert
+SACHSENNETZE,2027-01-01,2027-12-31,62.00,7.45,vorlaeufig,Beispielwert
+WESTNETZ,2025-01-01,2025-12-31,80.00,10.20,endgueltig,Beispielwert
+WESTNETZ,2026-01-01,2026-12-31,80.00,8.40,endgueltig,Beispielwert
+WESTNETZ,2027-01-01,2027-12-31,82.00,8.70,vorlaeufig,Beispielwert

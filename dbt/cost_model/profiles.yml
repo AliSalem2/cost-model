@@ -1,0 +1,8 @@
+cost_model:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      # One local file is the whole warehouse. Relative to dbt/cost_model.
+      path: "{{ env_var('DUCKDB_PATH', 'cost_model.duckdb') }}"
+      threads: 2

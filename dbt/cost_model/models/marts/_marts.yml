@@ -1,0 +1,164 @@
+version: 2
+
+models:
+  - name: mart_direkte_kosten_kunde
+    description: Direkte Kosten je Kunde an einem Stichtag, pro kWh und pro Jahr (netto, ohne Energiebeschaffung).
+    columns:
+      - name: kunden_id
+        tests: [not_null, unique]
+      - name: stichtag
+        tests: [not_null]
+      - name: ist_vollstaendig
+        tests: [not_null]
+
+  - name: mart_direkte_kosten_kunde_historie
+    description: Alle gesicherten Stichtage aus den lokalen Parquet-Dateien.
+    columns:
+      - name: stichtag
+        tests: [not_null]
+      - name: kunden_id
+        tests: [not_null]
+
+  - name: mart_szenario_bundeszuschuss
+    description: Direkte Kosten 2027 je Kunde mit und ohne Bundeszuschuss (Zuschusswert illustrativ).
+    columns:
+      - name: szenario_code
+        tests: [not_null]
+      - name: kunden_id
+        tests: [not_null]
+      - name: gesamtkosten_eur_pro_jahr
+        tests: [not_null]
+
+unit_tests:
+  # Handrechnung: 6.50 + 0.446 + 0.941 + 1.559 + 2.39 + 2.05 = 13.886 ct/kWh
+  # 13.886 ct * 2500 kWh = 347.15 EUR, plus 55 EUR Grundpreis = 402.15 EUR = 16.086 ct/kWh
+  - name: rechnet_kosten_von_hand_nach
+    model: mart_direkte_kosten_kunde
+    overrides:
+      vars: {stichtag: "2026-06-15"}
+    given: &stammdaten
+      - input: ref('stg_kunden')
+        rows:
+          - {kunden_id: K1, plz: "10115", ort: Berlin, einwohner_ort: 3700000, netzbetreiber_id: N1, jahresverbrauch_kwh: 2500, vertragsbeginn: 2025-03-01}
+      - input: ref('stg_netzentgelte')
+        rows:
+          - {netzbetreiber_id: N1, gueltig_ab: 2025-01-01, gueltig_bis: 2025-12-31, grundpreis_eur_pro_jahr: 50.00, arbeitspreis_ct_pro_kwh: 8.10, ist_vorlaeufig: false}
+          - {netzbetreiber_id: N1, gueltig_ab: 2026-01-01, gueltig_bis: 2026-12-31, grundpreis_eur_pro_jahr: 55.00, arbeitspreis_ct_pro_kwh: 6.50, ist_vorlaeufig: false}
+          - {netzbetreiber_id: N1, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, grundpreis_eur_pro_jahr: 58.00, arbeitspreis_ct_pro_kwh: 6.75, ist_vorlaeufig: true}
+      - input: ref('int_umlagen')
+        rows:
+          - {umlage_code: KWKG, gueltig_ab: 2025-01-01, gueltig_bis: 2025-12-31, ct_pro_kwh: 0.277}
+          - {umlage_code: OFFSHORE, gueltig_ab: 2025-01-01, gueltig_bis: 2025-12-31, ct_pro_kwh: 0.816}
+          - {umlage_code: BESONDERE_NETZNUTZUNG, gueltig_ab: 2025-01-01, gueltig_bis: 2025-12-31, ct_pro_kwh: 1.558}
+          - {umlage_code: KWKG, gueltig_ab: 2026-01-01, gueltig_bis: 2026-12-31, ct_pro_kwh: 0.446}
+          - {umlage_code: OFFSHORE, gueltig_ab: 2026-01-01, gueltig_bis: 2026-12-31, ct_pro_kwh: 0.941}
+          - {umlage_code: BESONDERE_NETZNUTZUNG, gueltig_ab: 2026-01-01, gueltig_bis: 2026-12-31, ct_pro_kwh: 1.559}
+      - input: ref('stg_konzessionsabgabe')
+        rows:
+          - {kundengruppe: Tarifkunde, einwohner_von: 100001, einwohner_bis: 500000, ct_pro_kwh: 1.99, gueltig_ab: 2025-01-01, gueltig_bis: 9999-12-31}
+          - {kundengruppe: Tarifkunde, einwohner_von: 500001, einwohner_bis: 999999999, ct_pro_kwh: 2.39, gueltig_ab: 2025-01-01, gueltig_bis: 9999-12-31}
+      - input: ref('stg_stromsteuer')
+        rows:
+          - {steuersatz_name: Regelsatz, gueltig_ab: 2025-01-01, gueltig_bis: 9999-12-31, ct_pro_kwh: 2.05}
+    expect:
+      rows:
+        - {kunden_id: K1, variable_kosten_ct_pro_kwh: 13.886, gesamtkosten_eur_pro_jahr: 402.15, gesamtkosten_ct_pro_kwh: 16.086, ist_vorlaeufig: false, ist_vollstaendig: true}
+
+  # Letzter Tag eines Zeitraums: noch der alte Satz.
+  # 8.10 + 0.277 + 0.816 + 1.558 + 2.39 + 2.05 = 15.191 ct/kWh
+  - name: letzter_gueltigkeitstag_nutzt_alten_satz
+    model: mart_direkte_kosten_kunde
+    overrides:
+      vars: {stichtag: "2025-12-31"}
+    given: *stammdaten
+    expect:
+      rows:
+        - {kunden_id: K1, variable_kosten_ct_pro_kwh: 15.191, grundpreis_eur_pro_jahr: 50.00}
+
+  - name: erster_gueltigkeitstag_nutzt_neuen_satz
+    model: mart_direkte_kosten_kunde
+    overrides:
+      vars: {stichtag: "2026-01-01"}
+    given: *stammdaten
+    expect:
+      rows:
+        - {kunden_id: K1, variable_kosten_ct_pro_kwh: 13.886, grundpreis_eur_pro_jahr: 55.00}
+
+  - name: kunde_vor_vertragsbeginn_fehlt
+    model: mart_direkte_kosten_kunde
+    overrides:
+      vars: {stichtag: "2025-02-28"}
+    given: *stammdaten
+    expect:
+      rows: []
+
+  # Netzentgelte fuer 2027, aber keine Umlagen in der Eingabe: Summen NULL, Kunde bleibt sichtbar.
+  - name: fehlende_umlagen_ergeben_unvollstaendig
+    model: mart_direkte_kosten_kunde
+    overrides:
+      vars: {stichtag: "2027-03-01"}
+    given: *stammdaten
+    expect:
+      rows:
+        - {kunden_id: K1, arbeitspreis_ct_pro_kwh: 6.75, gesamtkosten_eur_pro_jahr: null, ist_vorlaeufig: true, ist_vollstaendig: false}
+
+  # Annahme fuer die Umlagen wird als ist_annahme sichtbar:
+  # 6.75 + 0.3 + 0.9 + 1.5 + 2.39 + 2.05 = 13.89 ct/kWh; 347.25 EUR + 58 EUR Grundpreis = 405.25 EUR
+  - name: umlagen_annahme_wird_gekennzeichnet
+    model: mart_direkte_kosten_kunde
+    overrides:
+      vars: {stichtag: "2027-03-01"}
+    given:
+      - input: ref('stg_kunden')
+        rows:
+          - {kunden_id: K1, einwohner_ort: 3700000, netzbetreiber_id: N1, jahresverbrauch_kwh: 2500, vertragsbeginn: 2025-03-01}
+      - input: ref('stg_netzentgelte')
+        rows:
+          - {netzbetreiber_id: N1, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, grundpreis_eur_pro_jahr: 58.00, arbeitspreis_ct_pro_kwh: 6.75, ist_vorlaeufig: true}
+      - input: ref('int_umlagen')
+        rows:
+          - {umlage_code: KWKG, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, ct_pro_kwh: 0.3, ist_annahme: true}
+          - {umlage_code: OFFSHORE, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, ct_pro_kwh: 0.9, ist_annahme: true}
+          - {umlage_code: BESONDERE_NETZNUTZUNG, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, ct_pro_kwh: 1.5, ist_annahme: true}
+      - input: ref('stg_konzessionsabgabe')
+        rows:
+          - {kundengruppe: Tarifkunde, einwohner_von: 500001, einwohner_bis: 999999999, ct_pro_kwh: 2.39, gueltig_ab: 2025-01-01, gueltig_bis: 9999-12-31}
+      - input: ref('stg_stromsteuer')
+        rows:
+          - {steuersatz_name: Regelsatz, gueltig_ab: 2025-01-01, gueltig_bis: 9999-12-31, ct_pro_kwh: 2.05}
+    expect:
+      rows:
+        - {kunden_id: K1, gesamtkosten_eur_pro_jahr: 405.25, ist_vorlaeufig: true, ist_annahme: true, ist_vollstaendig: true}
+
+  # Basis wie oben: 13.89 ct/kWh, 405.25 EUR.
+  # Ohne Zuschuss: 15.49 ct/kWh * 2500 kWh = 387.25 EUR + 58 EUR Grundpreis = 445.25 EUR, also 40 EUR mehr.
+  - name: szenario_ohne_zuschuss_erhoeht_arbeitspreis
+    model: mart_szenario_bundeszuschuss
+    overrides:
+      vars: {szenario_stichtag: "2027-03-01"}
+    given:
+      - input: ref('stg_szenarien')
+        rows:
+          - {szenario_code: MIT_BUNDESZUSCHUSS, netzentgelt_aufschlag_ct_pro_kwh: 0.00, quelle: Annahme}
+          - {szenario_code: OHNE_BUNDESZUSCHUSS, netzentgelt_aufschlag_ct_pro_kwh: 1.60, quelle: Beispielwert}
+      - input: ref('stg_kunden')
+        rows:
+          - {kunden_id: K1, einwohner_ort: 3700000, netzbetreiber_id: N1, jahresverbrauch_kwh: 2500, vertragsbeginn: 2025-03-01}
+      - input: ref('stg_netzentgelte')
+        rows:
+          - {netzbetreiber_id: N1, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, grundpreis_eur_pro_jahr: 58.00, arbeitspreis_ct_pro_kwh: 6.75, ist_vorlaeufig: true}
+      - input: ref('int_umlagen')
+        rows:
+          - {umlage_code: KWKG, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, ct_pro_kwh: 0.3, ist_annahme: true}
+          - {umlage_code: OFFSHORE, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, ct_pro_kwh: 0.9, ist_annahme: true}
+          - {umlage_code: BESONDERE_NETZNUTZUNG, gueltig_ab: 2027-01-01, gueltig_bis: 2027-12-31, ct_pro_kwh: 1.5, ist_annahme: true}
+      - input: ref('stg_konzessionsabgabe')
+        rows:
+          - {kundengruppe: Tarifkunde, einwohner_von: 500001, einwohner_bis: 999999999, ct_pro_kwh: 2.39, gueltig_ab: 2025-01-01, gueltig_bis: 9999-12-31}
+      - input: ref('stg_stromsteuer')
+        rows:
+          - {steuersatz_name: Regelsatz, gueltig_ab: 2025-01-01, gueltig_bis: 9999-12-31, ct_pro_kwh: 2.05}
+    expect:
+      rows:
+        - {szenario_code: MIT_BUNDESZUSCHUSS, kunden_id: K1, arbeitspreis_ct_pro_kwh: 6.75, gesamtkosten_eur_pro_jahr: 405.25, differenz_zur_basis_eur_pro_jahr: 0.00, ist_illustrativ: false}
+        - {szenario_code: OHNE_BUNDESZUSCHUSS, kunden_id: K1, arbeitspreis_ct_pro_kwh: 8.35, gesamtkosten_eur_pro_jahr: 445.25, differenz_zur_basis_eur_pro_jahr: 40.00, ist_illustrativ: true}
