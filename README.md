@@ -58,13 +58,22 @@ The `cost_model` DAG runs `ingest_umlagen >> dbt_seed >> dbt_run >> dbt_test` on
 
 **Ingestion:** put a file with the same columns as `seeds/umlagen.csv` in `data/eingang/umlagen.csv`. The next run validates it, merges it into the seed by `umlage_code` and `gueltig_ab`, and moves it to `data/eingang/archiv/`. An invalid file fails the task and leaves the seed unchanged. Nothing is downloaded from the web. Tests: `cd scripts && python3 -m unittest test_ingest_umlagen`.
 
-**Backfill:** Airflow must be running. Runs start at midnight in Berlin, which is the previous day in UTC, and backfill dates are read as UTC. So `--from-date` must be one day before the first date you want:
+**Backfill:** backfill runs only rebuild the date's mart. They skip ingestion, seeds and tests, which takes each date from about 23 seconds to about 11. So load the current data first and test the result afterwards:
 
 ```bash
+# Airflow stopped. Load seeds, build all models, run all tests.
+(cd dbt/cost_model && ../../.venv-dbt/bin/dbt build --profiles-dir .)
+
+# Still stopped, or a long backfill fails with "database is locked". --from-date is one day
+# before the first date you want: runs start at midnight in Berlin, the previous day in UTC.
 airflow backfill create --dag-id cost_model --from-date 2024-12-31 --to-date 2025-12-31 --max-active-runs 1
+airflow standalone
+
+# When it has finished, test all saved dates.
+(cd dbt/cost_model && ../../.venv-dbt/bin/dbt test --profiles-dir . --select mart_direkte_kosten_kunde_historie)
 ```
 
-Each date takes about 30 seconds, and results land in `historie/`. The `mart_direkte_kosten_kunde` table holds whichever run finished last, so read `mart_direkte_kosten_kunde_historie` after a backfill. Add `--reprocess-behavior failed` to retry failed dates.
+Results land in `historie/`. The `mart_direkte_kosten_kunde` table holds whichever run finished last, so read `mart_direkte_kosten_kunde_historie` after a backfill. Add `--reprocess-behavior failed` to retry failed dates. Don't run dbt or open the DuckDB file during a backfill, because that can fail a date with a lock error.
 
 **One writer at a time:** DuckDB allows a single writer, so all dbt tasks use the one-slot pool `duckdb_schreiber`, created by `setup.sh`. Without that pool, the tasks will not be scheduled.
 

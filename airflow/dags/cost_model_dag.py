@@ -7,6 +7,9 @@ This fills all of 2025:
 
     airflow backfill create --dag-id cost_model --from-date 2024-12-31 --to-date 2025-12-31
 
+Backfill runs only rebuild the date's mart, which takes about half the time. They skip
+ingestion, seeds and tests, so see the README for what to run before and after a backfill.
+
 The 2027 scenario table is rebuilt by dbt_run on every run and does not depend on the date.
 """
 
@@ -44,6 +47,10 @@ def stichtag(dag_run):
 
 DBT_VARS = "--vars '{stichtag: {{ stichtag(dag_run) }}}'"
 
+# BashOperator marks a task as skipped when its command exits with 99.
+NICHT_IM_BACKFILL = "{% if dag_run.run_type == 'backfill' %}exit 99; {% endif %}"
+IM_BACKFILL_NUR_MART = "{% if dag_run.run_type == 'backfill' %}--select mart_direkte_kosten_kunde{% endif %}"
+
 with DAG(
     dag_id="cost_model",
     description="Direct cost components (levies, grid fees) into tested dbt models",
@@ -57,24 +64,26 @@ with DAG(
 ) as dag:
     ingest_umlagen = BashOperator(
         task_id="ingest_umlagen",
-        bash_command=f"{sys.executable} {PROJECT_ROOT / 'scripts' / 'ingest_umlagen.py'}",
+        bash_command=f"{NICHT_IM_BACKFILL}{sys.executable} {PROJECT_ROOT / 'scripts' / 'ingest_umlagen.py'}",
     )
 
     dbt_seed = BashOperator(
         task_id="dbt_seed",
-        bash_command=f"{DBT} seed {DBT_FLAGS}",
+        bash_command=f"{NICHT_IM_BACKFILL}{DBT} seed {DBT_FLAGS}",
         pool=DUCKDB_POOL,
     )
 
     dbt_run = BashOperator(
         task_id="dbt_run",
-        bash_command=f"{DBT} run {DBT_FLAGS} {DBT_VARS}",
+        bash_command=f"{DBT} run {DBT_FLAGS} {DBT_VARS} {IM_BACKFILL_NUR_MART}",
         pool=DUCKDB_POOL,
+        # Must still run when a backfill skips the tasks before it, but not after a failure.
+        trigger_rule="none_failed",
     )
 
     dbt_test = BashOperator(
         task_id="dbt_test",
-        bash_command=f"{DBT} test {DBT_FLAGS} {DBT_VARS}",
+        bash_command=f"{NICHT_IM_BACKFILL}{DBT} test {DBT_FLAGS} {DBT_VARS}",
         pool=DUCKDB_POOL,
     )
 
